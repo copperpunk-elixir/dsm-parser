@@ -1,19 +1,10 @@
 defmodule DsmParser do
-  @moduledoc """
-  Documentation for `DsmParser`.
-  """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> DsmParser.hello()
-      :world
-
-  """
   require Logger
   use Bitwise
+
+  @moduledoc """
+  Parse and store DSM packets coming from Spektrum receiver.
+  """
 
   @pw_mid 991
   @pw_half_range 819
@@ -28,6 +19,7 @@ defmodule DsmParser do
   @got_sync1 1
   @got_sync2 2
 
+  @doc false
   defstruct parser_state: @got_none,
             count: 0,
             payload_rev: [],
@@ -36,16 +28,38 @@ defmodule DsmParser do
             channel_count: 0,
             remaining_data: []
 
+  # Public API
+  @doc """
+  Create a new DsmParser struct that can parse new serial data and
+  store the most recently received RX output.
+  """
   @spec new() :: struct()
   def new() do
     %DsmParser{}
   end
 
+  @doc """
+  Appends the latest data to any leftover data from the previous `check_for_new_messages` operation.
+
+  Arguments are the `%DsmParser{}` struct and the newest serial data from the receiver (must already by converted from binary to list)
+
+  Returns `{%DsmParser{}, [list of channels]}`. If no valid SBus messages was found, the list of channels will be empty.
+
+  NOTE: After a valid message has been received, the `clear` function must be called if you do not want the channel values to persist.
+  Otherwise this function will continue to return a populated channel list even if a new valid message has not been received.
+
+  Example:
+  ```
+  {dsm_parser, channel_values} = DsmParser.check_for_new_messages(dsm_parser, new_data_list)
+  dsm_parser = DsmParser.clear()
+  ```
+  """
+
   @spec check_for_new_messages(struct(), list()) :: tuple()
   def check_for_new_messages(dsm, data) do
     dsm = parse_data(dsm, data)
 
-    if (dsm.payload_ready) do
+    if dsm.payload_ready do
       channel_values = get_channels(dsm)
       {dsm, channel_values}
     else
@@ -53,6 +67,7 @@ defmodule DsmParser do
     end
   end
 
+  @doc false
   @spec parse_data(struct(), list()) :: struct()
   def parse_data(dsm, data) do
     data = dsm.remaining_data ++ data
@@ -71,6 +86,7 @@ defmodule DsmParser do
     end
   end
 
+  @doc false
   @spec parse_byte(struct(), integer()) :: struct()
   def parse_byte(dsm, byte) do
     parser_state = dsm.parser_state
@@ -112,6 +128,7 @@ defmodule DsmParser do
     end
   end
 
+  @doc false
   @spec parse_payload(struct(), list()) :: struct()
   def parse_payload(dsm, payload_rev) do
     payload = Enum.reverse(payload_rev)
@@ -131,11 +148,13 @@ defmodule DsmParser do
         _other ->
           {%{}, 0}
       end
-      # Logger.warn("count: #{channel_count}")
+
+    # Logger.warn("count: #{channel_count}")
     payload_ready = if channel_count == 14, do: true, else: false
     %{dsm | payload_ready: payload_ready, channel_count: channel_count, channel_map: channel_map}
   end
 
+  @doc false
   @spec extract_channels(list(), map()) :: tuple()
   def extract_channels(payload_words, channel_map) do
     Enum.reduce(payload_words, {channel_map, 0}, fn [msb, lsb], {channels, count} ->
@@ -151,23 +170,29 @@ defmodule DsmParser do
     end)
   end
 
+  @doc false
   @spec get_channel_id(integer()) :: integer()
   def get_channel_id(word) do
     Bitwise.>>>(word, 10)
     |> Bitwise.&&&(0x1F)
   end
 
+  @doc false
   @spec get_msg_id(list()) :: integer()
   def get_msg_id(word) do
     [msb, _lsb] = word
     Bitwise.>>>(msb, 7)
   end
 
+  @doc false
   @spec get_channel_value(integer()) :: integer()
   def get_channel_value(word) do
     Bitwise.&&&(word, 0x03FF) * 2
   end
 
+  @doc """
+  Returns the stored channel values.
+  """
   @spec get_channels(struct()) :: list()
   def get_channels(dsm) do
     Enum.reduce(13..0, [], fn ch_index, acc ->
@@ -177,6 +202,9 @@ defmodule DsmParser do
     end)
   end
 
+  @doc """
+  Empties the stored channel value list.
+  """
   @spec clear(struct()) :: struct()
   def clear(dsm) do
     %{dsm | payload_ready: false}
