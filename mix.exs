@@ -1,13 +1,13 @@
 defmodule DsmParser.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.1.1"
   @source_url "https://github.com/copperpunk-elixir/dsm-parser"
 
   def project do
     [
       app: :dsm_parser,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.11",
       description: description(),
       package: package(),
