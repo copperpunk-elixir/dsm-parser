@@ -41,9 +41,11 @@ defmodule DsmParser do
   @doc """
   Appends the latest data to any leftover data from the previous `check_for_new_messages` operation.
 
-  Arguments are the `%DsmParser{}` struct and the newest serial data from the receiver (must already by converted from binary to list)
+  Arguments are the `%DsmParser{}` struct and the newest serial data from the receiver (must already by converted from binary to list).
 
   Returns `{%DsmParser{}, [list of channels]}`. If no valid SBus messages was found, the list of channels will be empty.
+  Will continue to check the data stream until it has reached the end of the list, so if multiple messages are contained in the data,
+  only the most recent will be stored.
 
   NOTE: After a valid message has been received, the `clear` function must be called if you do not want the channel values to persist.
   Otherwise this function will continue to return a populated channel list even if a new valid message has not been received.
@@ -51,7 +53,7 @@ defmodule DsmParser do
   Example:
   ```
   {dsm_parser, channel_values} = DsmParser.check_for_new_messages(dsm_parser, new_data_list)
-  dsm_parser = DsmParser.clear()
+  dsm_parser = DsmParser.clear(dsm_parser)
   ```
   """
 
